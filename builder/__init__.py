@@ -147,8 +147,7 @@ class BuilderManager:
 
     def set_crontab(self):
         if platform.system() != 'Linux':
-            self.logger.warning("No Linux, Crontab will not set!")
-            return True
+            self.logger.warning("Not Linux system, Crontab will not set!")
         user = subprocess.run(["whoami"], stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
         if user == 'root':
             self.logger.warning("you are using root user")
@@ -157,40 +156,46 @@ class BuilderManager:
         cron_header = 'SHELL=/bin/sh\n' \
                       'PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin\n\n' \
                       '# m h dom mon dow user  command\n'
-        services, services_possible = self.get_services_list()
         crontab = []
-        for service_name in services:
-            sqlite_file = self._get_sqlite_file(service_name)
-            try:
-                cron = self.store.get_crontab(sqlite_file)
-            except Exception as e:
-                self.logger.error('failed: {}'.format(str(e)))
-                return False
-            if cron:
-                app = self.setting['CMD']
-                cron_log = join(self.setting['LOG_DIR'], service_name + '.log')
-                crontab.append('{} {} {} {} >> {} 2>&1\n'.format(cron, app, '--batchrun', service_name, cron_log))
-        cron_path = self.setting['CRON_FILE']
-        cron = cron_header + "".join(crontab)
-        with open(cron_path, "w") as f:
-            f.write(cron)
-        self.logger.info("set cron tab")
-        # "crontab -u user cron_path" need root in alpine
-        subprocess.run(['crontab', cron_path])
-        # "crond reload" not exists in alpine
-        # self.logger.info("reload cron config")
-        # subprocess.run(['/etc/init.d/cron', 'reload'])
+        if exists(self.setting['DATABASE_FILE']):
+            with open(self.setting['DATABASE_FILE'], 'r', encoding="utf-8") as f:
+                services = json.load(f)
+            for service_name, service in services.items():
+                if 'synchronization' in service and 'crontab' in service['synchronization'] and \
+                    service['synchronization']['crontab']:
+                    cron = service['synchronization']['crontab']
+                    app = self.setting['CMD']
+                    cron_log = join(self.setting['LOG_DIR'], service_name + '.log')
+                    crontab.append('{} {} {} {} >> {} 2>&1\n'.format(cron, app, '--batchrun', service_name, cron_log))
+        else:
+            self.logger.error("Database file not exists!")
+            return False
+        
+        if crontab:
+            cron_path = self.setting['CRON_FILE']
+            cron = cron_header + "".join(crontab)
+            with open(cron_path, "w") as f:
+                f.write(cron)
+            # "crontab -u user cron_path" need root in alpine
+            if platform.system() == 'Linux':
+                self.logger.info("set cron tab")
+                subprocess.run(['crontab', cron_path])
+            # "crond reload" not exists in alpine
+            # self.logger.info("reload cron config")
+            # subprocess.run(['/etc/init.d/cron', 'reload'])
+        else:
+            self.logger.info("No cron job found!")
         return True
 
     def autoconf(self):
-        services, services_possible = self.get_services_list()
-        for service_name in services_possible:
-            self.add_service(service_name)
         self.set_crontab()
 
     def batchrun_service(self, service_name: str):
-        self.parse_service(service_name)
-        self.mirror_service(service_name)
+        build_services, publish_services = self.get_services_list()
+        if service_name in build_services:
+            self.build_service(service_name)
+        if service_name in publish_services:
+            self.publish_service(service_name)
 
     def init(self):
         build_services, publish_services = self.get_services_list()
