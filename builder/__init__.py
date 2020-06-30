@@ -188,6 +188,7 @@ class BuilderManager:
         return True
 
     def autoconf(self):
+        self.init()
         self.set_crontab()
 
     def batchrun_service(self, service_name: str):

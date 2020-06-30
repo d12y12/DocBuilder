@@ -53,14 +53,14 @@ def process(options, args):
         return True
     if options.build:
         if len(args) != 1:
-            usage_error("--parse only take 1 argument <service name>")
+            usage_error("--build only take 1 argument <service name>")
             return False
         service_name = args[0]
         print_cmd_result(builder_manager.build_service(service_name))
         return True
     if options.publish:
         if len(args) != 1:
-            usage_error("--mirror only take 1 argument <service name>")
+            usage_error("--publish only take 1 argument <service name>")
             return False
         service_name = args[0]
         print_cmd_result(builder_manager.publish_service(service_name))
