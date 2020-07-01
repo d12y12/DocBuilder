@@ -78,6 +78,12 @@ def process(options, args):
         service_name = args[0]
         builder_manager.batchrun_service(service_name)
         return True
+    if options.init:
+        if len(args) > 0:
+            usage_error("--init take no argument")
+            return False
+        builder_manager.init()
+        return True
 
 
 def cli(argv=None):
@@ -108,9 +114,11 @@ def cli(argv=None):
 
     group_devspace = optparse.OptionGroup(parser, "Devspace Options")
     group_devspace.add_option("--autoconf", action='store_true', dest="autoconf",
-                              help="Auto add service avaialbe and update crontab")
+                              help="Auto update crontab")
     group_devspace.add_option("--batchrun", action='store_true', dest="batchrun",
                               help="Run build and publish for <service name>")
+    group_devspace.add_option("--init", action='store_true', dest="init",
+                      help="For devspace init all service and first checkout")
     parser.add_option_group(group_devspace)
 
     if len(argv) == 1:
